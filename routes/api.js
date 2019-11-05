@@ -91,9 +91,27 @@ module.exports = function (app) {
       reply.save().then(responseCreate => res.json(responseCreate))
     })
     .put(function (req, res) {
-      res.json({ bbb: 'aaa' })
+      const { reply_id } = req.body
+      if (!reply_id) {
+        res.status(400).json({ error: 'invalid reply identifier' })
+      } else {
+        Reply.findOneAndUpdate(
+          { _id: reply_id },
+          { $set: { reported: true } },
+          { new: true }
+        ).then(result => res.json({ result: result }))
+      }
     })
     .delete(function (req, res) {
-      res.json({ bbb: 'aaa' })
+      const { reply_id } = req.body
+      if (!reply_id) {
+        res.status(400).json({ error: 'invalid reply identifier' })
+      } else {
+        Reply.findOneAndUpdate(
+          { _id: reply_id },
+          { $set: { text: '[deleted]' } },
+          { new: true }
+        ).then(result => res.json({ result: result }))
+      }
     })
 }
