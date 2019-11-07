@@ -15,26 +15,25 @@ module.exports = function (app) {
   app
     .route('/api/threads/:board')
     .get(function (req, res) {
-      //  I can GET an array of the most recent 10 bumped threads on the board
-      // with only the most recent 3 replies from /api/threads/{board}.
-      // The reported and delete_passwords fields will not be sent.
-      const { limit } = req.query || 10
+      const { limit, thread_id } = req.query
       const { board } = req.params
-      Thread.getThreads(board, limit).then(
-        result => res.json({ threads: result }) // The reported and delete_passwords fields will not be sent
-      )
-      //  add replies to posts
+      if (thread_id) {
+        console.log('Thread id : ' + thread_id)
+        Thread.getThreadWithReplies(thread_id).then(rsp => res.json(rsp))
+      } else {
+        Thread.getThreads(board, limit || 10).then(threads =>
+          Promise.all(threads.map(t => t.withLatestReplies(3))).then(rsp =>
+            res.json(rsp)
+          )
+        )
+      }
     })
     .post(function (req, res) {
-      //  extract data from post req body and path
-      const { text, deletePassword } = req.body
+      const { text, delete_password } = req.body
       const { board } = req.params
       //  create thread
-      let thread = new Thread({ text, deletePassword, board })
+      let thread = new Thread({ text, deletePassword: delete_password, board })
       thread.save().then(r => res.json(r))
-
-      // console.log([text, deletePassword, board])
-      // res.json({ params: [board, text, deletePassword] })
     })
     .put(function (req, res) {
       // const { board } = req.params
@@ -49,27 +48,21 @@ module.exports = function (app) {
           { _id: thread_id },
           { $set: { reported: true } },
           { new: true }
-        ).then(result => res.json({ result: result }))
+        ).then(result => res.json({ result }))
       }
     })
     .delete(function (req, res) {
       const { board } = req.params
       const { thread_id, delete_password } = req.body
-      Thread.findById(thread_id).then(result => {
-        if (
-          result &&
-          delete_password &&
-          result.deletePassword == delete_password
-        ) {
+      Thread.findOneAndDelete({
+        _id: thread_id,
+        deletePassword: delete_password
+      }).then(
+        result =>
           result
-            .remove()
-            .then(deleteResult => res.json({ data: deleteResult }))
-        } else {
-          res
-            .status(400)
-            .json({ error: 'invalid thread identifier or delete password' })
-        }
-      })
+            ? res.json({ status: 'success' })
+            : res.status(400).json({ error: 'incorrect password' })
+      )
     })
   app
     .route('/api/replies/:board')
@@ -88,7 +81,15 @@ module.exports = function (app) {
         board,
         thread: thread_id
       })
-      reply.save().then(responseCreate => res.json(responseCreate))
+      reply
+        .save()
+        .then(responseCreate =>
+          Thread.findById(responseCreate.thread).then(foundThread =>
+            foundThread
+              .addReply(responseCreate._id)
+              .then(result => res.json({ result }))
+          )
+        )
     })
     .put(function (req, res) {
       const { reply_id } = req.body
@@ -99,19 +100,28 @@ module.exports = function (app) {
           { _id: reply_id },
           { $set: { reported: true } },
           { new: true }
-        ).then(result => res.json({ result: result }))
+        )
+          .then(result => res.json({ result: 'success' }))
+          .catch()
       }
     })
     .delete(function (req, res) {
-      const { reply_id } = req.body
+      const { reply_id, delete_password } = req.body
       if (!reply_id) {
         res.status(400).json({ error: 'invalid reply identifier' })
       } else {
         Reply.findOneAndUpdate(
-          { _id: reply_id },
+          { _id: reply_id, deletePassword: delete_password },
           { $set: { text: '[deleted]' } },
           { new: true }
-        ).then(result => res.json({ result: result }))
+        )
+          .then(
+            result =>
+              result
+                ? res.json({ status: 'success' })
+                : res.status(400).json({ error: 'incorrect password' })
+          )
+          .catch(error => res.json({ error }))
       }
     })
 }
