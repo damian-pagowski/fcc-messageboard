@@ -19,7 +19,7 @@ app.use(cors({ origin: '*' })) // For FCC testing purposes only
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
 
-app.use(helmet())
+app.use(helmet({ referrerPolicy: { policy: 'same-origin' } }))
 
 const PORT = process.env.PORT || 3000
 const DB_URI = process.env.MONGOLAB_URI || 3000
