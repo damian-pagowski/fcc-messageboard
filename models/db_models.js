@@ -17,14 +17,14 @@ const ThreadSchema = new Schema({
 ThreadSchema.statics.getThreads = function (board, limit) {
   return this.find({ board })
     .select('-deletePassword -reported')
-    .sort({ date: -1 })
+    .sort({ created_on: -1 })
     .limit(parseInt(limit))
 }
 
 ThreadSchema.statics.getThreadWithReplies = function(id) {
   return this.findById( id )
   .select('-deletePassword -reported')
-    .sort({ date: -1 })
+    .sort({ created_on: -1 })
     .populate('replies')
 
 }
@@ -57,7 +57,7 @@ const ReplySchema = new Schema({
 ReplySchema.statics.getReplies = function (thread, limit) {
   return this.find({ thread })
     .select('-deletePassword -reported')
-    .sort({ date: -1 })
+    .sort({ created_on: -1 })
     .limit(parseInt(limit))
 }
 
